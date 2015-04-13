@@ -10,15 +10,15 @@ $:.push File.expand_path('../lib', __FILE__)
 require 'acao_billboard/version'
 
 Gem::Specification.new do |s|
-  s.name        = 'meteo'
+  s.name        = 'acao_billboard'
   s.version     = AcaoBillboard::VERSION
   s.authors     = ['Daniele Orlandi']
   s.email       = ['daniele@orlandi.com']
   s.homepage    = 'https://acao.it/'
-  s.summary     = %q{Receives, processes and serves meteo data from various sensors}
-  s.description = %q{Receives, processes and serves meteo data from various sensors}
+  s.summary     = %q{Receives meteo info and shows it on the billboard}
+  s.description = %q{Receives meteo info and shows it on the billboard}
 
-  s.rubyforge_project = 'meteo'
+  s.rubyforge_project = 'acao_billboard'
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
@@ -30,5 +30,4 @@ Gem::Specification.new do |s|
 
   s.add_runtime_dependency 'ygg_agent', '~> 2.1.0'
   s.add_runtime_dependency 'activesupport'
-  s.add_runtime_dependency 'http_parser'
 end
