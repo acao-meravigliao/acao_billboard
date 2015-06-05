@@ -72,17 +72,17 @@ class App < Ygg::Agent::Base
       datetime = (Time.now.strftime "%H:%M   %d/%m/%Y").ljust(20)
 
       if @keys_freshness['wind_speed'] && @keys_freshness['wind_speed'] > (Time.now - 30.seconds)
-        gust = @meteo['wind_2m_gst'].to_f > 0 ?
-                "\x11G #{'%.0f' % @meteo['wind_2m_gst'].to_f}" :
+        gust = @meteo['wind_2m_gst'].to_f > 4 ?
+                "\x11Gst #{'%.0f' % (@meteo['wind_2m_gst'].to_f * 3.6)}" :
                 ""
 
-        wind = "#{wind_dir_name2(wind: @meteo['wind_dir'])} #{'%.2g' % ('%.1f' % @meteo['wind_speed'].to_f)} km/h #{gust}".ljust(20)
+        wind = "#{wind_dir_name2(wind: @meteo['wind_dir'])} #{'%.2g' % ('%.1f' % (@meteo['wind_speed'].to_f * 3.6))} km/h #{gust}".ljust(22)
       else
         wind = 'INOP'
       end
 
       if @keys_freshness['qfe'] && @keys_freshness['qfe'] > (Time.now - 30.seconds)
-        pressuretemp = "QNH #{'%.0f' % (@meteo['qnh'] / 100)} hPa #{'%0.1f' % @meteo['temperature']} C".ljust(20)
+        pressuretemp = "QNH #{'%.0f' % (@meteo['qnh'] / 100)} hPa #{'%0.0f' % @meteo['temperature']} C".ljust(20)
       else
         pressuretemp = 'INOP'
       end
@@ -98,19 +98,20 @@ class App < Ygg::Agent::Base
 
       @serial.write(
         "\x02\x01" +
-        "\x18\x1E#{head}\x02" +
+#        "\x18\x1E#{head}\x02" +
         "\x18\x1E#{datetime}\x02" +
         "\x18\x1E#{wind}\x02" +
+        "\x18\x1E#{''.ljust(22)}\x02" +
         "\x18\x1E#{pressuretemp}\x02\x00")
     end
   end
 
   def actor_shutdown
     @serial.write("\x02\x01" +
-      "\x19\x1EINOP\x02" +
-      "\x19\x1EINOP\x02" +
-      "\x19\x1EINOP\x02" +
-      "\x19\x1EINOP\x02\x00")
+      "\x19\x1E#{'INOP'.ljust(22)}\x02" +
+      "\x19\x1E#{'INOP'.ljust(22)}\x02" +
+      "\x19\x1E#{'INOP'.ljust(22)}\x02" +
+      "\x19\x1E#{'INOP'.ljust(22)}\x02\x00")
   end
 
   def handle(message)
