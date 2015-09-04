@@ -58,8 +58,8 @@ class App < Ygg::Agent::Base
       manual_ack: true)).value.consumer_tag
 
     @serial = SerialPort.new(
-      '/dev/tty_billboard',
-      'baud' => 9600,
+      @config['acao_billboard.serial.device'],
+      'baud' => @config['acao_billboard.serial.speed'],
       'data_bits' => 8,
       'stop_bits' => 1,
       'parity' => SerialPort::NONE)
