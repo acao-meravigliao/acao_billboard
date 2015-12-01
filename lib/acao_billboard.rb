@@ -7,12 +7,12 @@
 # License:: You can redistribute it and/or modify it under the terms of the LICENSE file.
 #
 
+require 'serialport.rb' # if we dont't add .rb sometimes serialport.so is loaded and .rb is not
+
 require 'ygg/agent/base'
 
 require 'acao_billboard/version'
 require 'acao_billboard/task'
-
-require 'serialport'
 
 module AcaoBillboard
 
@@ -33,36 +33,43 @@ class App < Ygg::Agent::Base
   end
 
   def agent_boot
-    @msg_queue = @amqp.ask(AM::AMQP::MsgDeclareQueue.new(
+    @amqp.ask(AM::AMQP::MsgQueueDeclare.new(
+      channel_id: @amqp_chan,
       name: 'ygg.acao.billboard.queue',
-      options: {
-        durable: false,
-        auto_delete: true,
-      }
-    )).value.queue_id
+      durable: false,
+      auto_delete: true,
+    )).value
 
-    @msg_exchange = @amqp.ask(AM::AMQP::MsgDeclareExchange.new(
-      name: 'ygg.acao.meteo',
+    @amqp.ask(AM::AMQP::MsgExchangeDeclare.new(
+      channel_id: @amqp_chan,
+      name: @config['acao_billboard.meteo_exchange'],
       type: :topic,
-      options: {
-        durable: true,
-        auto_delete: false,
-      }
-    )).value.exchange_id
+      durable: true,
+      auto_delete: false,
+    )).value
 
-    @amqp.ask(AM::AMQP::MsgBind.new(queue_id: @msg_queue, exchange_id: @msg_exchange, options: { routing_key: '#' })).value
+    @amqp.ask(AM::AMQP::MsgQueueBind.new(
+      channel_id: @amqp_chan,
+      queue_name: 'ygg.acao.billboard.queue',
+      exchange_name: @config['acao_billboard.meteo_exchange'],
+      routing_key: '*'
+    )).value
 
-    @msg_consumer = @amqp.ask(AM::AMQP::MsgSubscribe.new(
-      queue_id: @msg_queue,
+    @msg_consumer = @amqp.ask(AM::AMQP::MsgConsume.new(
+      channel_id: @amqp_chan,
+      queue_name: 'ygg.acao.billboard.queue',
       send_to: self.actor_ref,
-      manual_ack: true)).value.consumer_tag
+    )).value.consumer_tag
 
     @serial = SerialPort.new(
       @config['acao_billboard.serial.device'],
       'baud' => @config['acao_billboard.serial.speed'],
       'data_bits' => 8,
       'stop_bits' => 1,
-      'parity' => SerialPort::NONE)
+      'parity' => SerialPort::NONE
+    )
+
+    @actor_epoll.add(@serial, SleepyPenguin::Epoll::IN)
 
     @keys_freshness = {}
     @meteo = {}
@@ -96,13 +103,15 @@ class App < Ygg::Agent::Base
         log.info '*' * (20+2)
       end
 
-      @serial.write(
-        "\x02\x01" +
-#        "\x18\x1E#{head}\x02" +
-        "\x18\x1E#{datetime}\x02" +
-        "\x18\x1E#{wind}\x02" +
-        "\x18\x1E#{''.ljust(22)}\x02" +
-        "\x18\x1E#{pressuretemp}\x02\x00")
+    @serial.write("\x02\x01" +
+      "#{'INOP'}\x02\x00")
+    #  @serial.write(
+    #    "\x02\x01" +
+    #    "\x18\x1E#{head}\x02" +
+    #    "\x18\x1E#{datetime}\x02" +
+    #    "\x18\x1E#{wind}\x02" +
+    #    "\x18\x1E#{''.ljust(22)}\x02" +
+    #    "\x18\x1E#{pressuretemp}\x02\x00")
     end
   end
 
@@ -114,22 +123,40 @@ class App < Ygg::Agent::Base
       "\x19\x1E#{'INOP'.ljust(22)}\x02\x00")
   end
 
+  def receive(events, io)
+    case io
+    when @serial
+      data = @serial.read_nonblock(65536)
+
+      log.debug "Serial Raw '#{data.unpack('H*').first}'" 
+
+      if !data || data.empty?
+        actor_exit
+        return
+      end
+    else
+      super
+    end
+  end
+
   def handle(message)
     case message
     when AM::AMQP::MsgDelivery
-      if message.delivery_info.consumer_tag == @msg_consumer
+      if message.consumer_tag == @msg_consumer
 #        if message.payload['msg_type'] == 'station_update'
 #          log.info "From #{message.payload['station_id']} #{message.payload['data']['wind_speed']}"
 
-        message.payload['data'].keys.each do |key|
-          @keys_freshness[key] = message.properties[:timestamp]
+        data = JSON.parse(message.payload)['data']
+
+        data.keys.each do |key|
+          @keys_freshness[key] = message.headers[:timestamp]
         end
 
-        @meteo.merge!(message.payload['data'])
+        @meteo.merge!(data)
 
 #        end
 
-        @amqp.tell AM::AMQP::MsgAck.new(delivery_tag: message.delivery_info.delivery_tag)
+        @amqp.tell AM::AMQP::MsgAck.new(channel_id: @amqp_chan, delivery_tag: message.delivery_tag)
       else
         super
       end
