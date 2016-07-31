@@ -1,6 +1,5 @@
-#!/usr/bin/env ruby
 #
-# Copyright (C) 2015-2015, Daniele Orlandi
+# Copyright (C) 2015-2016, Daniele Orlandi
 #
 # Author:: Daniele Orlandi <daniele@orlandi.com>
 #
@@ -123,12 +122,12 @@ class App < Ygg::Agent::Base
       "\x19\x1E#{'INOP'.ljust(22)}\x02\x00")
   end
 
-  def receive(events, io)
+  def actor_receive(events, io)
     case io
     when @serial
       data = @serial.read_nonblock(65536)
 
-      log.debug "Serial Raw '#{data.unpack('H*').first}'" 
+      log.debug "Serial Raw '#{data.unpack('H*').first}'"
 
       if !data || data.empty?
         actor_exit
