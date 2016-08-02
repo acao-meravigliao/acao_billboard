@@ -68,7 +68,7 @@ class App < Ygg::Agent::Base
       'parity' => SerialPort::NONE
     )
 
-    @actor_epoll.add(@serial, SleepyPenguin::Epoll::IN)
+    @actor_epoll.add(@serial, AM::Epoll::IN)
 
     @keys_freshness = {}
     @meteo = {}
@@ -138,7 +138,7 @@ class App < Ygg::Agent::Base
     end
   end
 
-  def handle(message)
+  def actor_handle(message)
     case message
     when AM::AMQP::MsgDelivery
       if message.consumer_tag == @msg_consumer
